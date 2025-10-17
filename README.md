@@ -13,6 +13,90 @@ Exemplar data for testing the project have been made available. In particular:
 It is important to stress that the two files above are just exemplars. It is possible that, during the use of the code developed, a user can use different CSV and JSON files. However, all these files must follow the convention (i.e. the structure) of those provided as exemplars.
 
 
+## ЕРУЛАН СМОТРИ ТУТ КАК НУЖНО
+
+Ниже описан полный порядок запуска проекта с использованием примерных данных, входящих в репозиторий.
+
+1. **Подготовьте окружение**
+   - Установите Python 3.10+ и Java 11+ (нужна для Blazegraph).
+   - Создайте и активируйте виртуальное окружение, затем установите зависимости:
+
+     ```bash
+     python3 -m venv .venv
+     source .venv/bin/activate  # в Windows: .\.venv\Scripts\activate
+     python -m pip install --upgrade pip
+     pip install pandas requests
+     ```
+
+2. **Запустите Blazegraph**
+   - Скачайте `blazegraph.jar` с [релизов Blazegraph](https://github.com/blazegraph/database/releases).
+   - Запустите SPARQL-эндпоинт (оставьте терминал открытым):
+
+     ```bash
+     java -server -Xmx1g -jar blazegraph.jar
+     ```
+
+   - По умолчанию эндпоинт будет доступен по адресу `http://127.0.0.1:9999/blazegraph/sparql`.
+
+3. **Загрузите примерные данные**
+   - Откройте новый терминал (виртуальное окружение должно быть активировано) и выполните:
+
+     ```bash
+     python - <<'PY'
+     from project import CategoryUploadHandler, JournalUploadHandler
+
+     relational_db = "relational.db"
+     category_handler = CategoryUploadHandler()
+     category_handler.setDbPathOrUrl(relational_db)
+     category_handler.pushDataToDb("data/scimago.json")
+
+     graph_endpoint = "http://127.0.0.1:9999/blazegraph/sparql"
+     journal_handler = JournalUploadHandler()
+     journal_handler.setDbPathOrUrl(graph_endpoint)
+     journal_handler.pushDataToDb("data/doaj.csv")
+     PY
+     ```
+
+   - В результате будет создан файл `relational.db`, а Blazegraph заполнится данными из CSV.
+
+4. **Выполните пробные запросы**
+
+   ```bash
+   python - <<'PY'
+   from project import FullQueryEngine, CategoryQueryHandler, JournalQueryHandler
+
+   relational_db = "relational.db"
+   graph_endpoint = "http://127.0.0.1:9999/blazegraph/sparql"
+
+   category_handler = CategoryQueryHandler()
+   category_handler.setDbPathOrUrl(relational_db)
+   journal_handler = JournalQueryHandler()
+   journal_handler.setDbPathOrUrl(graph_endpoint)
+
+   engine = FullQueryEngine()
+   engine.addCategoryHandler(category_handler)
+   engine.addJournalHandler(journal_handler)
+
+   journals = engine.getAllJournals()
+   print(f"Всего журналов: {len(journals)}")
+   print([journal.getTitle() for journal in journals[:5]])
+
+   subset = engine.getJournalsInCategoriesWithQuartile({"Artificial Intelligence"}, {"Q1"})
+   print(f"Журналы Q1 по AI: {[journal.getId() for journal in subset]}")
+   PY
+   ```
+
+   Остановите Blazegraph сочетанием `Ctrl+C`, когда он больше не нужен.
+
+5. **Запустите юнит-тесты**
+   - При необходимости откорректируйте импорты в `test.py`, чтобы они указывали на модуль `project`. Если система тестирования ожидает модуль `impl`, создайте файл `impl.py`, который просто импортирует всё из `project`.
+   - Выполните:
+
+     ```bash
+     python -m unittest test
+     ```
+
+
 ## Workflow
 
 ![Workflow of the project](img/workflow.png)
